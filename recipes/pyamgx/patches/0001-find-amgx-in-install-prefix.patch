@@ -1,0 +1,38 @@
+--- a/setup.py	2024-09-24 06:31:44.000000000 -0400
++++ b/setup.py	2026-10-28 14:51:33.208977692 -0400
+@@ -16,14 +16,19 @@
+     lib_name = 'libamgxsh.so'
+ 
+ if not AMGX_DIR:
+-    # look in PREFIX:
++    # look in an installed prefix (conda layout: Library/ on Windows):
+     PREFIX = sys.prefix
+-    if os.path.isfile(os.path.join(PREFIX, f'lib/{lib_name}')):
++    if sys.platform == "win32":
++        lib_path = os.path.join(PREFIX, 'Library', 'lib')
++        found = os.path.isfile(os.path.join(lib_path, 'amgxsh.lib'))
++        AMGX_include_dirs = [os.path.join(PREFIX, 'Library', 'include')]
++    else:
+         lib_path = os.path.join(PREFIX, 'lib')
+-        AMGX_lib_dirs = [lib_path]
++        found = os.path.isfile(os.path.join(lib_path, lib_name))
+         AMGX_include_dirs = [os.path.join(PREFIX, 'include')]
+-    else:
+-        raise EnvironmentError(f'AMGX_DIR not set and {lib_name} not found')
++    if not found:
++        raise EnvironmentError(f'AMGX_DIR not set and AMGX not found under {lib_path}')
++    AMGX_lib_dirs = [lib_path]
+ else:
+     if not AMGX_BUILD_DIR:
+         AMGX_BUILD_DIR = os.path.join(AMGX_DIR, 'build')
+@@ -62,8 +67,8 @@
+     Extension(
+         'pyamgx',
+         sources=['pyamgx/pyamgx.pyx'],
+-        extra_compile_args=['-fopenmp'],
+-        extra_link_args=['-lgomp'],
++        extra_compile_args=[] if sys.platform == "win32" else ['-fopenmp'],
++        extra_link_args=[] if sys.platform == "win32" else ['-lgomp'],
+         depends=['pyamgx/*.pyx, pyamgx/*.pxi'],
+         libraries=['amgxsh'],
+         language='c',

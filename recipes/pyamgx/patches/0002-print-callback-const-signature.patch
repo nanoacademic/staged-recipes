@@ -1,0 +1,13 @@
+diff --git a/pyamgx/System.pyx b/pyamgx/System.pyx
+index 1e30e90..e5a2b23 100644
+--- a/pyamgx/System.pyx
++++ b/pyamgx/System.pyx
+@@ -49,7 +49,7 @@ def reset_signal_handler():
+ cdef void c_register_print_callback(AMGX_print_callback function):
+     AMGX_register_print_callback(function)
+ 
+-cdef void c_print_callback(char *msg, int length) noexcept:
++cdef void c_print_callback(const char *msg, int length) noexcept:
+     global print_callback
+     print_callback(msg.decode('utf-8'))
+ 

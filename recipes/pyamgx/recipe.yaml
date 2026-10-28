@@ -1,0 +1,78 @@
+schema_version: 1
+
+context:
+  # Defaulted so the recipe renders without a variant config (linter).
+  cuda_compiler_version: ${{ cuda_compiler_version | default("None") }}
+  cuda_major: ${{ (cuda_compiler_version | split(".") | first) if cuda_compiler_version != "None" else "0" }}
+  # setup.py declares 0.1; upstream has no tag or release
+  # (https://github.com/shwina/pyamgx/issues/29), so the source is a pinned commit.
+  version: "0.1"
+  commit: 6229ff008ee5a264cfc1799eeb2f83d96da0aadc
+
+package:
+  name: pyamgx
+  version: ${{ version }}
+
+source:
+  url: https://github.com/shwina/pyamgx/archive/${{ commit }}.tar.gz
+  sha256: bc33e90f6144e89fb513ed8c038e57931ae185612de94923dee0a7bc528742b4
+  patches:
+    # Find AMGX in the host prefix, including the Library/ layout on Windows.
+    - patches/0001-find-amgx-in-install-prefix.patch
+    # AMGX's print callback takes a const char*; current Cython rejects the mismatch.
+    - patches/0002-print-callback-const-signature.patch
+
+build:
+  number: 0
+  # Built per CUDA variant because amgx only exists for CUDA variants.
+  skip:
+    - cuda_compiler_version == "None"
+    - osx
+  string: cuda${{ cuda_major }}py${{ python | version_to_buildstring }}h${{ hash }}_${{ build_number }}
+  variant:
+    use_keys:
+      - cuda_compiler_version
+  # setup.py locates AMGX under sys.prefix, which is the host prefix.
+  script: ${{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ stdlib('c') }}
+    - if: build_platform != host_platform
+      then:
+        - python
+        - cross-python_${{ host_platform }}
+        - cython
+        - numpy
+  host:
+    - python
+    - pip
+    - setuptools
+    - cython
+    - numpy
+    - amgx
+    - cuda-version ${{ cuda_compiler_version }}.*
+  run:
+    - python
+    - scipy
+
+tests:
+  - python:
+      imports:
+        - pyamgx
+      pip_check: true
+  - script:
+      - python -c "import pyamgx; print(pyamgx.get_api_version())"
+
+about:
+  homepage: https://github.com/shwina/pyamgx
+  repository: https://github.com/shwina/pyamgx
+  documentation: https://pyamgx.readthedocs.io/
+  summary: Python interface to NVIDIA's AmgX GPU multigrid solver library
+  license: BSD-3-Clause
+  license_file: LICENSE.txt
+
+extra:
+  recipe-maintainers:
+    - oliviertremblaynoel

@@ -1,0 +1,56 @@
+--- a/CMakeLists.txt	2025-12-21 10:21:02.000000000 -0500
++++ b/CMakeLists.txt	2026-10-28 15:08:08.620840528 -0400
+@@ -215,6 +215,22 @@
+ 
+ ENDIF()
+ 
++# Drop requested architectures below AMGX's minimum (sm_70), so that a
++# toolchain-wide default list such as conda-forge's CUDAARCHS can be passed as is.
++set(_amgx_archs "")
++foreach(_arch IN LISTS CMAKE_CUDA_ARCHITECTURES)
++  string(REGEX MATCH "^[0-9]+" _arch_num "${_arch}")
++  if(_arch_num AND _arch_num GREATER_EQUAL 70)
++    list(APPEND _amgx_archs "${_arch}")
++  else()
++    message(STATUS "Skipping unsupported CUDA architecture: ${_arch}")
++  endif()
++endforeach()
++if(NOT _amgx_archs)
++  message(FATAL_ERROR "None of the requested CUDA architectures (${CMAKE_CUDA_ARCHITECTURES}) is supported by AMGX (minimum sm_70)")
++endif()
++set(CMAKE_CUDA_ARCHITECTURES "${_amgx_archs}" CACHE STRING "Target CUDA architectures" FORCE)
++
+ # Validate CMAKE_CUDA_ARCHITECTURES against what this CUDA version supports
+ message(STATUS "CUDA ${CMAKE_CUDA_COMPILER_VERSION} supports architectures: ${CUDA_ALLOW_ARCH}")
+ message(STATUS "Building for architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+@@ -248,11 +264,11 @@
+ target_compile_options(amgxsh PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: ${CUDA_NVCC_FLAGS} >)
+ 
+ IF (WIN32)
+-  target_link_libraries(amgx CUDA::cublas CUDA::cusparse CUDA::cusolver)
+-  target_link_libraries(amgxsh CUDA::cublas CUDA::cusparse CUDA::cusolver)
++  target_link_libraries(amgx CUDA::cublas CUDA::cusparse CUDA::cusolver CUDA::curand)
++  target_link_libraries(amgxsh CUDA::cublas CUDA::cusparse CUDA::cusolver CUDA::curand)
+ ELSE (WIN32)
+-  target_link_libraries(amgx CUDA::cublas CUDA::cusparse CUDA::cusolver m pthread)
+-  target_link_libraries(amgxsh CUDA::cublas CUDA::cusparse CUDA::cusolver m pthread)
++  target_link_libraries(amgx CUDA::cublas CUDA::cusparse CUDA::cusolver CUDA::curand m pthread)
++  target_link_libraries(amgxsh CUDA::cublas CUDA::cusparse CUDA::cusolver CUDA::curand m pthread)
+ ENDIF(WIN32)
+ 
+ if(MPI_FOUND)
+@@ -267,8 +283,12 @@
+   include/amgx_c.h
+   DESTINATION include)
+ 
+-install(TARGETS amgx   DESTINATION "lib")
+-install(TARGETS amgxsh DESTINATION "lib")
++include(GNUInstallDirs)
++
++install(TARGETS amgxsh
++  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
++  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+ 
+ #export(TARGETS amgxsh FILE ${CMAKE_CURRENT_SOURCE_DIR}/amgxsh.cmake)
+ 

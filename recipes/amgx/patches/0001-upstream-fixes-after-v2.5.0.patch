@@ -1,0 +1,55 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0de63cfa..8a8297cd 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -56,7 +56,7 @@ if(${CMAKE_BINARY_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+ endif(${CMAKE_BINARY_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+ 
+ # declare the supported configurations
+-set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Profile;RelWithTraces" CACHE STRING "Avaialble Configuration Types" FORCE)
++set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Profile;RelWithTraces" CACHE STRING "Available Configuration Types" FORCE)
+ 
+ # make sure a build type has been chosen!!!
+ IF(NOT CMAKE_BUILD_TYPE)
+@@ -65,6 +65,15 @@ ENDIF(NOT CMAKE_BUILD_TYPE)
+ 
+ find_package(CUDAToolkit 12.0 REQUIRED)
+ 
++# CUDA 13.1+ requires C++17 for Thrust and CUDA C++ Core Libraries
++if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.1")
++  message(STATUS "CUDA ${CUDAToolkit_VERSION} detected, setting C++17 standard")
++  set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard" FORCE)
++  set(CMAKE_CXX_STANDARD_REQUIRED ON)
++  set(CMAKE_CUDA_STANDARD 17 CACHE STRING "CUDA C++ standard" FORCE)
++  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
++endif()
++
+ # update/define the compilation flags.
+ IF(WIN32)
+   set(CMAKE_C_FLAGS                "/DWIN32 /D_WINDOWS /W3 /bigobj" CACHE STRING "" FORCE)
+diff --git a/examples/amgx_capi.h b/examples/amgx_capi.h
+index 8b4343a1..0094c2a2 100644
+--- a/examples/amgx_capi.h
++++ b/examples/amgx_capi.h
+@@ -57,7 +57,7 @@ typedef enum
+     AMGX_SOLVE_SUCCESS = 0,
+     AMGX_SOLVE_FAILED = 1,
+     AMGX_SOLVE_DIVERGED = 2,
+-    AMGX_SOLVE_NOT_CONVERGED = 2,
++    AMGX_SOLVE_NOT_CONVERGED = 3,
+ } AMGX_SOLVE_STATUS;
+ 
+ /*********************************************************
+diff --git a/include/amgx_c.h b/include/amgx_c.h
+index dc60a544..fda72ac7 100644
+--- a/include/amgx_c.h
++++ b/include/amgx_c.h
+@@ -590,7 +590,7 @@ AMGX_RC AMGX_API AMGX_matrix_check_symmetry
+  int* structurally_symmetric,
+  int* symmetric);
+ 
+-AMGX_RC AMGX_matrix_check_diag_dominant
++AMGX_RC AMGX_API AMGX_matrix_check_diag_dominant
+ (const AMGX_matrix_handle mtx, 
+  int* diag_dominant);
+ 

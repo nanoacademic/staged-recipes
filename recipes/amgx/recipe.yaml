@@ -1,0 +1,91 @@
+schema_version: 1
+
+context:
+  # Defaulted so the recipe renders without a variant config (linter).
+  cuda_compiler_version: ${{ cuda_compiler_version | default("None") }}
+  cuda_major: ${{ (cuda_compiler_version | split(".") | first) if cuda_compiler_version != "None" else "0" }}
+  version: "2.5.0"
+
+package:
+  name: amgx
+  version: ${{ version }}
+
+source:
+  url: https://github.com/NVIDIA/AMGX/archive/refs/tags/v${{ version }}.tar.gz
+  sha256: 0e7ade653ac1f31b4c849ee9545f8eb573193eed9b1deff26ab07cb59f022af4
+  patches:
+    # Upstream main after v2.5.0: AMGX_API export on AMGX_matrix_check_diag_dominant
+    # (needed for the DLL), distinct AMGX_SOLVE_NOT_CONVERGED value, C++17 with CUDA 13.1+.
+    - patches/0001-upstream-fixes-after-v2.5.0.patch
+    # Drop CUDA architectures below sm_70 from the requested list, link cuRAND
+    # (used but never linked upstream), and install only the shared library,
+    # into bin/ on Windows and lib/ elsewhere.
+    - patches/0002-filter-cuda-archs-and-install-shared-library.patch
+
+build:
+  number: 0
+  skip:
+    - cuda_compiler_version == "None"
+    - osx
+  string: cuda${{ cuda_major }}h${{ hash }}_${{ build_number }}
+  variant:
+    use_keys:
+      - cuda_compiler_version
+  script:
+    file: ${{ "build.bat" if win else "build.sh" }}
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ compiler('cuda') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+  host:
+    - cuda-version ${{ cuda_compiler_version }}.*
+    - cuda-cudart-dev
+    - libcublas-dev
+    - libcusparse-dev
+    - libcusolver-dev
+    - libcurand-dev
+    - if: linux
+      then: cuda-nvtx-dev
+  run:
+    - __cuda
+  run_exports:
+    - ${{ pin_subpackage('amgx', upper_bound='x.x') }}
+  ignore_run_exports:
+    from_package:
+      # NVTX3 is header-only.
+      - cuda-nvtx-dev
+      # cuRAND is only called from a code path the linker discards; nothing in
+      # the shared library references libcurand.
+      - libcurand-dev
+
+tests:
+  - package_contents:
+      include:
+        - amgx_c.h
+        - amgx_config.h
+      lib:
+        - amgxsh
+
+about:
+  homepage: https://github.com/NVIDIA/AMGX
+  repository: https://github.com/NVIDIA/AMGX
+  documentation: https://github.com/NVIDIA/AMGX/blob/main/doc/AMGX_Reference.pdf
+  summary: GPU accelerated algebraic multigrid and Krylov solvers for sparse linear systems
+  description: |
+    AmgX is NVIDIA's library of algebraic multigrid, Krylov and classical
+    iterative solvers for sparse linear systems on CUDA GPUs. This package
+    ships the single-GPU (non-MPI) build of the shared library and its C API
+    headers.
+  license: BSD-3-Clause
+  license_file:
+    - LICENSES/BSD-3-Clause.txt
+    - NOTICES
+
+extra:
+  recipe-maintainers:
+    - oliviertremblaynoel
